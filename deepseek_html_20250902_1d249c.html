@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador 3D Simplificado</title>
+    <title>Visualizador 3D - Bobina Inkcine</title>
     <style>
         * {
             margin: 0;
@@ -88,14 +88,23 @@
             padding: 8px 15px;
             border-radius: 8px;
         }
+        
+        .error-message {
+            display: none;
+            color: #ff5555;
+            text-align: center;
+            max-width: 80%;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <div class="logo">Visualizador 3D</div>
+    <div class="logo">Visualizador 3D - Bobina Inkcine</div>
     
     <div class="loading-overlay">
         <div class="spinner"></div>
         <p>Carregando modelo 3D...</p>
+        <p class="error-message" id="errorMsg"></p>
     </div>
     
     <div class="controls-info">
@@ -153,8 +162,8 @@
             // Inicializar relógio para animações
             clock = new THREE.Clock();
             
-            // Carregar modelo de exemplo (substitua pela URL do seu modelo)
-            loadModel('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Parrot.glb');
+            // Carregar modelo
+            loadModel('Bobina_Inkcine_optimized.glb');
             
             // Ajustar para redimensionamento da janela
             window.addEventListener('resize', onWindowResize);
@@ -189,10 +198,22 @@
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
                 
-                model.position.x += (model.position.x - center.x);
-                model.position.y += (model.position.y - center.y);
-                model.position.z += (model.position.z - center.z);
+                // Calcular o ajuste de posição para centralizar
+                model.position.x -= center.x;
+                model.position.y -= center.y;
+                model.position.z -= center.z;
                 
+                // Ajustar a câmera para visualizar todo o modelo
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / Math.sin(fov / 2));
+                
+                // Limitar a distância da câmera
+                cameraZ = Math.min(Math.max(cameraZ, 5), 50);
+                camera.position.z = cameraZ;
+                
+                // Atualizar os controles
+                controls.update();
                 controls.reset();
                 
                 // Esconder tela de carregamento
@@ -200,7 +221,9 @@
                 
             }, undefined, function(error) {
                 console.error('Erro ao carregar o modelo:', error);
-                document.querySelector('.loading-overlay p').textContent = 'Erro ao carregar o modelo.';
+                document.getElementById('errorMsg').textContent = 
+                    'Erro ao carregar o modelo. Verifique se o arquivo Bobina_Inkcine_optimized.glb está na mesma pasta.';
+                document.getElementById('errorMsg').style.display = 'block';
             });
         }
         
