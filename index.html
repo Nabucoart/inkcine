@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #2c3e50;
+            background: #7f8c8d; /* Cinza neutro */
             height: 100vh;
             width: 100vw;
         }
@@ -39,7 +39,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(30, 30, 30, 0.95);
+            background: rgba(120, 130, 130, 0.95); /* Cinza mais claro */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -88,40 +88,41 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(100, 100, 100, 0.7);
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
             cursor: pointer;
             z-index: 10;
             backdrop-filter: blur(5px);
             transition: all 0.3s;
-            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
         
         .fullscreen-btn:hover {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(80, 80, 80, 0.9);
+            transform: scale(1.1);
         }
         
+        .fullscreen-icon {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+        
+        /* Estilos para modo tela cheia */
+        :fullscreen .fullscreen-btn {
+            display: block;
+        }
+        
+        /* Esconder controles de informação */
         .controls-info {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            color: rgba(255, 255, 255, 0.8);
-            background-color: rgba(0, 0, 0, 0.4);
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 12px;
-            pointer-events: none;
-            transition: opacity 0.5s;
-            z-index: 10;
-            opacity: 0.7;
-            backdrop-filter: blur(5px);
-        }
-        
-        .hide {
-            opacity: 0;
+            display: none;
         }
     </style>
 </head>
@@ -134,11 +135,11 @@
         </div>
     </div>
     
-    <button class="fullscreen-btn" id="fullscreenBtn">Tela Cheia</button>
-    
-    <div class="controls-info">
-        Mouse: Girar | Scroll: Zoom | Botão direito: Mover
-    </div>
+    <button class="fullscreen-btn" id="fullscreenBtn" title="Tela Cheia">
+        <svg class="fullscreen-icon" viewBox="0 0 24 24">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+    </button>
     
     <div id="canvas-container">
         <canvas id="modelViewer"></canvas>
@@ -154,11 +155,13 @@
         let scene, camera, renderer, controls, mixer, clock;
         let model;
         let loadingTimeout;
+        let isFullscreen = false;
         
         // Inicializa a cena
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x7f8c8d); // Cinza neutro
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -169,7 +172,7 @@
             renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas, 
                 antialias: true,
-                alpha: true,
+                alpha: false, // Fundo sólido
                 powerPreference: "high-performance"
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -193,12 +196,7 @@
             window.addEventListener('resize', onWindowResize);
             
             // Configurar botão de tela cheia
-            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-            
-            // Esconder informações de controles após alguns segundos
-            setTimeout(() => {
-                document.querySelector('.controls-info').classList.add('hide');
-            }, 5000);
+            setupFullscreenButton();
             
             // Iniciar animação
             animate();
@@ -206,24 +204,90 @@
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+            // Luz ambiente principal (aumentada)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
             scene.add(ambientLight);
             
-            // Luz direcional principal
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            // Luz direcional principal (aumentada)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
             directionalLight.position.set(5, 10, 7);
             scene.add(directionalLight);
             
-            // Luz de preenchimento
-            const fillLight = new THREE.DirectionalLight(0x7777ff, 0.8);
-            fillLight.position.set(-5, 5, 5);
+            // Luz azul (aumentada 5x)
+            const blueLight = new THREE.DirectionalLight(0x4488ff, 4.0); // 5x mais intensa
+            blueLight.position.set(-5, 5, 5);
+            scene.add(blueLight);
+            
+            // Luz de preenchimento adicional
+            const fillLight = new THREE.DirectionalLight(0x8888ff, 1.5);
+            fillLight.position.set(0, -5, 5);
             scene.add(fillLight);
             
             // Luz traseira para destacar contornos
-            const backLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            const backLight = new THREE.DirectionalLight(0xffffff, 1.2);
             backLight.position.set(0, 0, -10);
             scene.add(backLight);
+            
+            // Luz hemisférica para iluminação global
+            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444477, 1.2);
+            scene.add(hemisphereLight);
+        }
+        
+        // Configurar botão de tela cheia
+        function setupFullscreenButton() {
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            
+            // Suporte a diferentes navegadores
+            const docElement = document.documentElement;
+            const requestFullscreen = docElement.requestFullscreen || 
+                                    docElement.mozRequestFullScreen || 
+                                    docElement.webkitRequestFullscreen || 
+                                    docElement.msRequestFullscreen;
+            
+            const exitFullscreen = document.exitFullscreen || 
+                                 document.mozCancelFullScreen || 
+                                 document.webkitExitFullscreen || 
+                                 document.msExitFullscreen;
+            
+            const fullscreenchange = document.fullscreenchange || 
+                                   document.webkitfullscreenchange || 
+                                   document.mozfullscreenchange || 
+                                   document.MSFullscreenChange;
+            
+            // Verificar se o fullscreen é suportado
+            if (!requestFullscreen) {
+                fullscreenBtn.style.display = 'none';
+                return;
+            }
+            
+            fullscreenBtn.addEventListener('click', function() {
+                if (!isFullscreen) {
+                    requestFullscreen.call(docElement);
+                } else {
+                    exitFullscreen.call(document);
+                }
+            });
+            
+            // Atualizar ícone quando entrar/sair do modo tela cheia
+            document.addEventListener('fullscreenchange', updateFullscreenButton);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+            document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+            document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+            
+            function updateFullscreenButton() {
+                isFullscreen = !!(document.fullscreenElement || 
+                                document.webkitFullscreenElement || 
+                                document.mozFullScreenElement || 
+                                document.msFullscreenElement);
+                
+                // Atualizar ícone
+                const icon = fullscreenBtn.querySelector('.fullscreen-icon');
+                if (isFullscreen) {
+                    icon.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+                } else {
+                    icon.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+                }
+            }
         }
         
         // Carregar modelo 3D
@@ -330,19 +394,6 @@
             controls.update();
         }
         
-        // Alternar tela cheia
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.error('Erro ao tentar entrar em tela cheia:', err);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        }
-        
         // Ajustar para redimensionamento da janela
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -368,17 +419,6 @@
         
         // Iniciar quando a página carregar
         window.addEventListener('load', init);
-        
-        // Mostrar controles quando o mouse se mover
-        document.addEventListener('mousemove', () => {
-            const controlsInfo = document.querySelector('.controls-info');
-            controlsInfo.classList.remove('hide');
-            
-            clearTimeout(controlsInfo.hideTimeout);
-            controlsInfo.hideTimeout = setTimeout(() => {
-                controlsInfo.classList.add('hide');
-            }, 3000);
-        });
     </script>
 </body>
 </html>
