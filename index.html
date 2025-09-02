@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador 3D - Embed</title>
+    <title>Visualizador 3D</title>
     <style>
         * {
             margin: 0;
@@ -16,6 +16,7 @@
             font-family: 'Segoe UI', sans-serif;
             background: #2c3e50;
             height: 100vh;
+            width: 100vw;
         }
         
         #canvas-container {
@@ -96,10 +97,31 @@
             z-index: 10;
             backdrop-filter: blur(5px);
             transition: all 0.3s;
+            font-size: 14px;
         }
         
         .fullscreen-btn:hover {
             background: rgba(0, 0, 0, 0.7);
+        }
+        
+        .controls-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            z-index: 10;
+            opacity: 0.7;
+            backdrop-filter: blur(5px);
+        }
+        
+        .hide {
+            opacity: 0;
         }
     </style>
 </head>
@@ -113,6 +135,10 @@
     </div>
     
     <button class="fullscreen-btn" id="fullscreenBtn">Tela Cheia</button>
+    
+    <div class="controls-info">
+        Mouse: Girar | Scroll: Zoom | Botão direito: Mover
+    </div>
     
     <div id="canvas-container">
         <canvas id="modelViewer"></canvas>
@@ -168,6 +194,11 @@
             
             // Configurar botão de tela cheia
             document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+            
+            // Esconder informações de controles após alguns segundos
+            setTimeout(() => {
+                document.querySelector('.controls-info').classList.add('hide');
+            }, 5000);
             
             // Iniciar animação
             animate();
@@ -239,6 +270,10 @@
                 
                 // Esconder tela de carregamento mesmo em caso de erro
                 hideLoadingScreen();
+                
+                // Mostrar mensagem de erro
+                document.querySelector('.loading-overlay p').textContent = 
+                    'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
             });
         }
         
@@ -333,6 +368,17 @@
         
         // Iniciar quando a página carregar
         window.addEventListener('load', init);
+        
+        // Mostrar controles quando o mouse se mover
+        document.addEventListener('mousemove', () => {
+            const controlsInfo = document.querySelector('.controls-info');
+            controlsInfo.classList.remove('hide');
+            
+            clearTimeout(controlsInfo.hideTimeout);
+            controlsInfo.hideTimeout = setTimeout(() => {
+                controlsInfo.classList.add('hide');
+            }, 3000);
+        });
     </script>
 </body>
 </html>
