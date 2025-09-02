@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #ffffff; /* Cinza neutro */
+            background: transparent; /* Fundo transparente */
             height: 100vh;
             width: 100vw;
         }
@@ -39,7 +39,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(120, 130, 130, 0.95); /* Cinza mais claro */
+            background: rgba(120, 130, 130, 0.95); /* Mantido para feedback de carregamento */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -119,11 +119,6 @@
         :fullscreen .fullscreen-btn {
             display: block;
         }
-        
-        /* Esconder controles de informação */
-        .controls-info {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -161,7 +156,7 @@
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x7f8c8d); // Cinza neutro
+            scene.background = null; // Fundo transparente
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -172,7 +167,7 @@
             renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas, 
                 antialias: true,
-                alpha: false, // Fundo sólido
+                alpha: true, // Permitir transparência
                 powerPreference: "high-performance"
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -249,11 +244,6 @@
                                  document.webkitExitFullscreen || 
                                  document.msExitFullscreen;
             
-            const fullscreenchange = document.fullscreenchange || 
-                                   document.webkitfullscreenchange || 
-                                   document.mozfullscreenchange || 
-                                   document.MSFullscreenChange;
-            
             // Verificar se o fullscreen é suportado
             if (!requestFullscreen) {
                 fullscreenBtn.style.display = 'none';
@@ -262,7 +252,9 @@
             
             fullscreenBtn.addEventListener('click', function() {
                 if (!isFullscreen) {
-                    requestFullscreen.call(docElement);
+                    requestFullscreen.call(docElement).catch(err => {
+                        console.error('Erro ao tentar entrar em tela cheia:', err);
+                    });
                 } else {
                     exitFullscreen.call(document);
                 }
