@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador 3D - Bobina Inkcine</title>
+    <title>Visualizador 3D</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background: linear-gradient(45deg, #2c3e50, #4ca1af);
             height: 100vh;
         }
         
@@ -24,7 +24,6 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1;
         }
         
         #modelViewer {
@@ -33,25 +32,13 @@
             height: 100%;
         }
         
-        .background-blur {
-            position: fixed;
-            top: -10px;
-            left: -10px;
-            width: calc(100% + 20px);
-            height: calc(100% + 20px);
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
-            filter: blur(15px);
-            z-index: 0;
-            opacity: 0.7;
-        }
-        
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.7);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -75,6 +62,22 @@
             to { transform: rotate(360deg); }
         }
         
+        .progress-bar {
+            width: 300px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        
+        .progress {
+            height: 100%;
+            background: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
         .controls-info {
             position: fixed;
             bottom: 20px;
@@ -88,78 +91,25 @@
             transition: opacity 0.5s;
             z-index: 10;
             backdrop-filter: blur(5px);
+            opacity: 0.7;
         }
         
         .hide {
             opacity: 0;
         }
-        
-        .logo {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-            background-color: rgba(0, 0, 0, 0.4);
-            padding: 8px 15px;
-            border-radius: 8px;
-            z-index: 10;
-            backdrop-filter: blur(5px);
-        }
-        
-        .error-message {
-            color: #ff5555;
-            text-align: center;
-            max-width: 80%;
-            margin-top: 20px;
-            display: none;
-        }
-        
-        .toolbar {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 10;
-        }
-        
-        .tool-btn {
-            background: rgba(0, 0, 0, 0.4);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s;
-        }
-        
-        .tool-btn:hover {
-            background: rgba(0, 0, 0, 0.6);
-            transform: translateY(-2px);
-        }
     </style>
 </head>
 <body>
-    <div class="background-blur"></div>
-    
-    <div class="logo">Visualizador 3D - Bobina Inkcine</div>
-    
     <div class="loading-overlay">
         <div class="spinner"></div>
         <p>Carregando modelo 3D...</p>
-        <p class="error-message" id="errorMsg"></p>
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
     </div>
     
     <div class="controls-info">
-        Use o mouse para navegar: Botão esquerdo para rotacionar, botão direito para pan, scroll para zoom
-    </div>
-    
-    <div class="toolbar">
-        <button class="tool-btn" id="resetView">Resetar Vista</button>
-        <button class="tool-btn" id="toggleLight">Luz</button>
+        Mouse: Girar | Scroll: Zoom | Botão direito: Mover
     </div>
     
     <div id="canvas-container">
@@ -174,35 +124,26 @@
     <script>
         // Variáveis globais
         let scene, camera, renderer, controls, mixer, clock;
-        let directionalLight, ambientLight, hemisphereLight;
+        let model;
         
         // Inicializa a cena
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000);
-            scene.background.alpha = 0; // Torna o fundo transparente
             
             // Configurar câmera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
             camera.position.z = 5;
             
             // Configurar renderizador
             renderer = new THREE.WebGLRenderer({ 
                 canvas: document.getElementById('modelViewer'), 
                 antialias: true,
-                alpha: true // Permitir fundo transparente
+                alpha: true,
+                powerPreference: "high-performance"
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            
-            // Adicionar controles de órbita
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.screenSpacePanning = false;
-            controls.minDistance = 1;
-            controls.maxDistance = 20;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitar pixel ratio para performance
             
             // Configurar sistema de iluminação avançado
             setupLighting();
@@ -221,44 +162,33 @@
                 document.querySelector('.controls-info').classList.add('hide');
             }, 5000);
             
-            // Configurar botões
-            document.getElementById('resetView').addEventListener('click', () => {
-                controls.reset();
-            });
-            
-            document.getElementById('toggleLight').addEventListener('click', () => {
-                directionalLight.visible = !directionalLight.visible;
-                ambientLight.visible = !ambientLight.visible;
-            });
-            
             // Iniciar animação
             animate();
         }
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente suave
-            ambientLight = new THREE.AmbientLight(0x404040, 1.2);
+            // Luz ambiente principal (muito mais forte)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
             scene.add(ambientLight);
             
             // Luz direcional principal (como sol)
-            directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
             directionalLight.position.set(5, 10, 7);
-            directionalLight.castShadow = true;
             scene.add(directionalLight);
             
             // Luz de preenchimento para reduzir sombras escuras
-            const fillLight = new THREE.DirectionalLight(0x7777ff, 0.5);
+            const fillLight = new THREE.DirectionalLight(0x7777ff, 1.5);
             fillLight.position.set(-5, 5, 5);
             scene.add(fillLight);
             
             // Luz traseira para destacar contornos
-            const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            const backLight = new THREE.DirectionalLight(0xffffff, 1.2);
             backLight.position.set(0, 0, -10);
             scene.add(backLight);
             
             // Luz hemisférica para iluminação ambiental natural
-            hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.6);
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.0);
             scene.add(hemisphereLight);
         }
         
@@ -267,7 +197,7 @@
             const loader = new THREE.GLTFLoader();
             
             loader.load(url, function(gltf) {
-                const model = gltf.scene;
+                model = gltf.scene;
                 scene.add(model);
                 
                 // Configurar animações se existirem
@@ -279,27 +209,10 @@
                 }
                 
                 // Centralizar e dimensionar o modelo
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
+                centerModel();
                 
-                // Calcular o ajuste de posição para centralizar
-                model.position.x -= center.x;
-                model.position.y -= center.y;
-                model.position.z -= center.z;
-                
-                // Ajustar a câmera para visualizar todo o modelo
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const fov = camera.fov * (Math.PI / 180);
-                let cameraZ = Math.abs(maxDim / Math.sin(fov / 2));
-                
-                // Limitar a distância da câmera
-                cameraZ = Math.min(Math.max(cameraZ, 5), 50);
-                camera.position.z = cameraZ;
-                
-                // Atualizar os controles
-                controls.update();
-                controls.reset();
+                // Configurar controles de órbita após o carregamento do modelo
+                setupControls();
                 
                 // Esconder tela de carregamento com transição suave
                 setTimeout(() => {
@@ -307,14 +220,60 @@
                     setTimeout(() => {
                         document.querySelector('.loading-overlay').style.display = 'none';
                     }, 500);
-                }, 1000);
+                }, 500);
                 
-            }, undefined, function(error) {
+            }, function(xhr) {
+                // Atualizar barra de progresso
+                const percentLoaded = (xhr.loaded / xhr.total) * 100;
+                document.getElementById('progress').style.width = percentLoaded + '%';
+            }, function(error) {
                 console.error('Erro ao carregar o modelo:', error);
-                document.getElementById('errorMsg').textContent = 
-                    'Erro ao carregar o modelo. Verifique se o arquivo Bobina_Inkcine_optimized.glb está na mesma pasta.';
-                document.getElementById('errorMsg').style.display = 'block';
             });
+        }
+        
+        // Centralizar e dimensionar o modelo
+        function centerModel() {
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Calcular o ajuste de posição para centralizar
+            model.position.x = -center.x;
+            model.position.y = -center.y;
+            model.position.z = -center.z;
+            
+            // Ajustar a câmera para visualizar todo o modelo
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            
+            // Ajustar a distância da câmera com base no tamanho do modelo
+            cameraZ *= 1.5; // Ajuste para garantir que o modelo caiba na visualização
+            
+            camera.position.z = cameraZ;
+            camera.far = Math.max(1000, cameraZ * 10);
+            camera.updateProjectionMatrix();
+            
+            // Definir os limites dos controles com base no tamanho do modelo
+            controls.maxDistance = cameraZ * 10;
+        }
+        
+        // Configurar controles de órbita
+        function setupControls() {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 0.1; // Zoom muito mais próximo
+            controls.maxDistance = 1000; // Zoom muito mais distante
+            controls.rotateSpeed = 1.0;
+            controls.enablePan = true;
+            
+            // Focar no centro do modelo
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            controls.target.copy(center);
+            controls.update();
         }
         
         // Ajustar para redimensionamento da janela
@@ -333,7 +292,10 @@
                 mixer.update(clock.getDelta());
             }
             
-            controls.update();
+            if (controls) {
+                controls.update();
+            }
+            
             renderer.render(scene, camera);
         }
         
