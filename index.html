@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #ffffff; /* Fundo branco */
+            background: #0a0a14; /* Fundo escuro azulado */
             height: 100vh;
             width: 100vw;
         }
@@ -39,13 +39,13 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.95); /* Fundo branco semi-transparente */
+            background: rgba(10, 10, 20, 0.95); /* Fundo escuro semi-transparente */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            color: #333; /* Texto escuro para contraste */
+            color: #e0e0ff; /* Texto azul claro */
             transition: opacity 0.5s ease-in-out;
         }
         
@@ -57,9 +57,9 @@
         .spinner {
             width: 50px;
             height: 50px;
-            border: 5px solid rgba(0, 0, 0, 0.1); /* Cinza claro */
+            border: 5px solid rgba(224, 224, 255, 0.2);
             border-radius: 50%;
-            border-top-color: #4CAF50; /* Verde */
+            border-top-color: #4CAF50;
             animation: spin 1s ease-in-out infinite;
             margin-bottom: 20px;
         }
@@ -71,7 +71,7 @@
         .progress-bar {
             width: 300px;
             height: 10px;
-            background: rgba(0, 0, 0, 0.1); /* Cinza muito claro */
+            background: rgba(224, 224, 255, 0.2);
             border-radius: 10px;
             overflow: hidden;
             margin-top: 20px;
@@ -79,7 +79,7 @@
         
         .progress {
             height: 100%;
-            background: #4CAF50; /* Verde */
+            background: #4CAF50;
             width: 0%;
             transition: width 0.3s;
         }
@@ -88,9 +88,9 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(255, 255, 255, 0.8); /* Branco semi-transparente */
-            color: #333; /* Texto escuro */
-            border: 1px solid #ddd; /* Borda sutil */
+            background: rgba(30, 30, 50, 0.8);
+            color: #e0e0ff;
+            border: none;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -101,28 +101,50 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
         }
         
         .fullscreen-btn:hover {
-            background: rgba(255, 255, 255, 1); /* Branco sólido */
+            background: rgba(50, 50, 80, 0.9);
             transform: scale(1.1);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         }
         
         .fullscreen-icon {
             width: 24px;
             height: 24px;
-            fill: #333; /* Ícone escuro */
+            fill: #e0e0ff;
         }
         
-        /* Estilos para modo tela cheia */
-        :fullscreen .fullscreen-btn {
-            display: block;
+        /* Efeito de partículas para fundo cinematográfico */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .particle {
+            position: absolute;
+            background: rgba(100, 150, 255, 0.15);
+            border-radius: 50%;
+            animation: float 15s infinite linear;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
         }
     </style>
 </head>
 <body>
+    <div class="particles" id="particles"></div>
+    
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p>Carregando modelo 3D...</p>
@@ -157,7 +179,7 @@
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xffffff); // Fundo branco
+            scene.background = new THREE.Color(0x0a0a14); // Fundo escuro azulado
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -168,7 +190,7 @@
             renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas, 
                 antialias: true,
-                alpha: false, // Fundo sólido
+                alpha: false,
                 powerPreference: "high-performance"
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -179,6 +201,9 @@
             
             // Inicializar relógio para animações
             clock = new THREE.Clock();
+            
+            // Criar partículas para fundo cinematográfico
+            createParticles();
             
             // Configurar timeout de segurança para esconder tela de carregamento
             loadingTimeout = setTimeout(() => {
@@ -200,33 +225,78 @@
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal (aumentada)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+            // Luz ambiente principal (aumentada para objeto preto)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
             scene.add(ambientLight);
             
-            // Luz direcional principal (aumentada)
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
-            directionalLight.position.set(5, 10, 7);
-            scene.add(directionalLight);
+            // Luz direcional principal (branca - frontal)
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.8);
+            directionalLight1.position.set(5, 8, 10);
+            directionalLight1.castShadow = true;
+            scene.add(directionalLight1);
             
-            // Luz azul (aumentada 5x)
-            const blueLight = new THREE.DirectionalLight(0x4488ff, 4.0); // 5x mais intensa
-            blueLight.position.set(-5, 5, 5);
-            scene.add(blueLight);
+            // Luz azul forte (lateral direita - 5x mais intensa)
+            const blueLight1 = new THREE.DirectionalLight(0x4488ff, 3.5);
+            blueLight1.position.set(10, 5, 5);
+            scene.add(blueLight1);
             
-            // Luz de preenchimento adicional
-            const fillLight = new THREE.DirectionalLight(0x8888ff, 1.5);
-            fillLight.position.set(0, -5, 5);
-            scene.add(fillLight);
+            // Segunda luz azul (lateral esquerda)
+            const blueLight2 = new THREE.DirectionalLight(0x3377ff, 2.5);
+            blueLight2.position.set(-10, 5, 5);
+            scene.add(blueLight2);
             
-            // Luz traseira para destacar contornos
-            const backLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            backLight.position.set(0, 0, -10);
+            // Luz branca traseira
+            const backLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            backLight.position.set(0, 5, -10);
             scene.add(backLight);
             
-            // Luz hemisférica para iluminação global
-            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444477, 1.2);
+            // Luz de preenchimento inferior (azul suave)
+            const fillLight = new THREE.DirectionalLight(0x88aaff, 1.5);
+            fillLight.position.set(0, -10, 5);
+            scene.add(fillLight);
+            
+            // Luz de preenchimento superior (branca)
+            const topLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            topLight.position.set(0, 10, 5);
+            scene.add(topLight);
+            
+            // Luz hemisférica para iluminação ambiental
+            const hemisphereLight = new THREE.HemisphereLight(0x4477aa, 0x112233, 0.8);
             scene.add(hemisphereLight);
+            
+            // Pontos de luz adicionais para destacar detalhes
+            const pointLight1 = new THREE.PointLight(0x4488ff, 1.5, 20);
+            pointLight1.position.set(8, 6, 8);
+            scene.add(pointLight1);
+            
+            const pointLight2 = new THREE.PointLight(0x4488ff, 1.5, 20);
+            pointLight2.position.set(-8, 6, 8);
+            scene.add(pointLight2);
+        }
+        
+        // Criar partículas para efeito cinematográfico
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 30;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                // Posição e tamanho aleatórios
+                const size = Math.random() * 4 + 1;
+                const posX = Math.random() * 100;
+                const posY = Math.random() * 100 + 100; // Começa abaixo da tela
+                const delay = Math.random() * 15;
+                
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${posX}%`;
+                particle.style.top = `${posY}%`;
+                particle.style.animationDelay = `${delay}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
         }
         
         // Configurar botão de tela cheia
