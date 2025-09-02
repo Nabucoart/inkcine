@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #0a0a14;
+            background: #0a0a14; /* Fundo escuro azulado */
             height: 100vh;
             width: 100vw;
         }
@@ -31,11 +31,6 @@
             display: block;
             width: 100%;
             height: 100%;
-            cursor: grab;
-        }
-        
-        #modelViewer.dragging {
-            cursor: grabbing;
         }
         
         .loading-overlay {
@@ -44,13 +39,13 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(10, 10, 20, 0.95);
+            background: rgba(10, 10, 20, 0.95); /* Fundo escuro semi-transparente */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            color: #e0e0ff;
+            color: #e0e0ff; /* Texto azul claro */
             transition: opacity 0.5s ease-in-out;
         }
         
@@ -121,6 +116,7 @@
             fill: #e0e0ff;
         }
         
+        /* Efeito de partículas para fundo cinematográfico */
         .particles {
             position: fixed;
             top: 0;
@@ -178,14 +174,12 @@
         let model;
         let loadingTimeout;
         let isFullscreen = false;
-        let raycaster = new THREE.Raycaster();
-        let mouse = new THREE.Vector2();
         
         // Inicializa a cena
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a14);
+            scene.background = new THREE.Color(0x0a0a14); // Fundo escuro azulado
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -231,7 +225,7 @@
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal
+            // Luz ambiente principal (aumentada para objeto preto)
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
             scene.add(ambientLight);
             
@@ -241,7 +235,7 @@
             directionalLight1.castShadow = true;
             scene.add(directionalLight1);
             
-            // Luz azul forte (lateral direita)
+            // Luz azul forte (lateral direita - 5x mais intensa)
             const blueLight1 = new THREE.DirectionalLight(0x4488ff, 3.5);
             blueLight1.position.set(10, 5, 5);
             scene.add(blueLight1);
@@ -292,7 +286,7 @@
                 // Posição e tamanho aleatórios
                 const size = Math.random() * 4 + 1;
                 const posX = Math.random() * 100;
-                const posY = Math.random() * 100 + 100;
+                const posY = Math.random() * 100 + 100; // Começa abaixo da tela
                 const delay = Math.random() * 15;
                 
                 particle.style.width = `${size}px`;
@@ -305,83 +299,11 @@
             }
         }
         
-        // Configurar controles de órbita com comportamento melhorado
-        function setupControls() {
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05; // Mais suave
-            controls.screenSpacePanning = false;
-            controls.minDistance = 0.1;
-            controls.maxDistance = 1000;
-            controls.rotateSpeed = 0.8; // Velocidade reduzida para melhor controle
-            controls.enablePan = true;
-            
-            // Configurar foco inicial
-            if (model) {
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                controls.target.copy(center);
-            }
-            
-            controls.update();
-            
-            // Adicionar comportamento de foco no ponto clicado
-            const canvas = renderer.domElement;
-            canvas.addEventListener('mousedown', onMouseDown);
-            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
-        }
-        
-        // Manipulador de clique do mouse
-        function onMouseDown(event) {
-            if (event.button !== 0) return; // Apenas botão esquerdo
-            
-            // Calcular posição normalizada do mouse
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            
-            // Verificar se clicou no modelo
-            raycaster.setFromCamera(mouse, camera);
-            
-            if (model) {
-                const intersects = raycaster.intersectObject(model, true);
-                
-                if (intersects.length > 0) {
-                    // Se clicou no modelo, focar no ponto de interseção
-                    controls.target.copy(intersects[0].point);
-                }
-            }
-        }
-        
-        // Manipulador de toque
-        function onTouchStart(event) {
-            if (event.touches.length === 1) {
-                event.preventDefault();
-                
-                const touch = event.touches[0];
-                const rect = renderer.domElement.getBoundingClientRect();
-                
-                mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-                
-                // Verificar se tocou no modelo
-                raycaster.setFromCamera(mouse, camera);
-                
-                if (model) {
-                    const intersects = raycaster.intersectObject(model, true);
-                    
-                    if (intersects.length > 0) {
-                        // Se tocou no modelo, focar no ponto de interseção
-                        controls.target.copy(intersects[0].point);
-                    }
-                }
-            }
-        }
-        
         // Configurar botão de tela cheia
         function setupFullscreenButton() {
             const fullscreenBtn = document.getElementById('fullscreenBtn');
             
+            // Suporte a diferentes navegadores
             const docElement = document.documentElement;
             const requestFullscreen = docElement.requestFullscreen || 
                                     docElement.mozRequestFullScreen || 
@@ -393,6 +315,7 @@
                                  document.webkitExitFullscreen || 
                                  document.msExitFullscreen;
             
+            // Verificar se o fullscreen é suportado
             if (!requestFullscreen) {
                 fullscreenBtn.style.display = 'none';
                 return;
@@ -408,6 +331,7 @@
                 }
             });
             
+            // Atualizar ícone quando entrar/sair do modo tela cheia
             document.addEventListener('fullscreenchange', updateFullscreenButton);
             document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
             document.addEventListener('mozfullscreenchange', updateFullscreenButton);
@@ -419,6 +343,7 @@
                                 document.mozFullScreenElement || 
                                 document.msFullscreenElement);
                 
+                // Atualizar ícone
                 const icon = fullscreenBtn.querySelector('.fullscreen-icon');
                 if (isFullscreen) {
                     icon.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
@@ -433,6 +358,7 @@
             const loader = new THREE.GLTFLoader();
             
             loader.load(url, function(gltf) {
+                // Limpar timeout se o modelo carregou antes
                 if (loadingTimeout) {
                     clearTimeout(loadingTimeout);
                 }
@@ -440,6 +366,7 @@
                 model = gltf.scene;
                 scene.add(model);
                 
+                // Configurar animações se existirem
                 if (gltf.animations && gltf.animations.length) {
                     mixer = new THREE.AnimationMixer(model);
                     gltf.animations.forEach((clip) => {
@@ -447,21 +374,31 @@
                     });
                 }
                 
+                // Centralizar e dimensionar o modelo
                 centerModel();
+                
+                // Configurar controles de órbita após o carregamento do modelo
                 setupControls();
+                
+                // Esconder tela de carregamento
                 hideLoadingScreen();
                 
             }, function(xhr) {
+                // Atualizar barra de progresso
                 const percentLoaded = (xhr.loaded / xhr.total) * 100;
                 document.getElementById('progress').style.width = percentLoaded + '%';
             }, function(error) {
                 console.error('Erro ao carregar o modelo:', error);
                 
+                // Limpar timeout em caso de erro
                 if (loadingTimeout) {
                     clearTimeout(loadingTimeout);
                 }
                 
+                // Esconder tela de carregamento mesmo em caso de erro
                 hideLoadingScreen();
+                
+                // Mostrar mensagem de erro
                 document.querySelector('.loading-overlay p').textContent = 
                     'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
             });
@@ -472,6 +409,7 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             loadingOverlay.classList.add('hidden');
             
+            // Remover completamente após a transição
             setTimeout(() => {
                 loadingOverlay.style.display = 'none';
             }, 500);
@@ -483,19 +421,40 @@
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             
+            // Calcular o ajuste de posição para centralizar
             model.position.x = -center.x;
             model.position.y = -center.y;
             model.position.z = -center.z;
             
+            // Ajustar a câmera para visualizar todo o modelo
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
             let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
             
+            // Ajustar a distância da câmera com base no tamanho do modelo
             cameraZ *= 1.5;
             
             camera.position.z = cameraZ;
             camera.far = Math.max(1000, cameraZ * 10);
             camera.updateProjectionMatrix();
+        }
+        
+        // Configurar controles de órbita
+        function setupControls() {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 0.1;
+            controls.maxDistance = 1000;
+            controls.rotateSpeed = 1.0;
+            controls.enablePan = true;
+            
+            // Focar no centro do modelo
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            controls.target.copy(center);
+            controls.update();
         }
         
         // Ajustar para redimensionamento da janela
@@ -509,11 +468,15 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            // Atualizar animações do modelo
             if (mixer) {
                 mixer.update(clock.getDelta());
             }
             
-            controls.update();
+            if (controls) {
+                controls.update();
+            }
+            
             renderer.render(scene, camera);
         }
         
