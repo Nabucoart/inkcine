@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #0a0a14; /* Fundo escuro azulado */
+            background: #e0e0e0; /* Fundo cinza claro */
             height: 100vh;
             width: 100vw;
         }
@@ -31,6 +31,12 @@
             display: block;
             width: 100%;
             height: 100%;
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        #modelViewer.dragging {
+            cursor: grabbing;
         }
         
         .loading-overlay {
@@ -39,13 +45,13 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(10, 10, 20, 0.95); /* Fundo escuro semi-transparente */
+            background: rgba(224, 224, 224, 0.98);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            color: #e0e0ff; /* Texto azul claro */
+            color: #333333;
             transition: opacity 0.5s ease-in-out;
         }
         
@@ -57,9 +63,9 @@
         .spinner {
             width: 50px;
             height: 50px;
-            border: 5px solid rgba(224, 224, 255, 0.2);
+            border: 5px solid rgba(51, 51, 51, 0.2);
             border-radius: 50%;
-            border-top-color: #4CAF50;
+            border-top-color: #0066cc;
             animation: spin 1s ease-in-out infinite;
             margin-bottom: 20px;
         }
@@ -71,7 +77,7 @@
         .progress-bar {
             width: 300px;
             height: 10px;
-            background: rgba(224, 224, 255, 0.2);
+            background: rgba(51, 51, 51, 0.2);
             border-radius: 10px;
             overflow: hidden;
             margin-top: 20px;
@@ -79,7 +85,7 @@
         
         .progress {
             height: 100%;
-            background: #4CAF50;
+            background: #0066cc;
             width: 0%;
             transition: width 0.3s;
         }
@@ -88,9 +94,9 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(30, 30, 50, 0.8);
-            color: #e0e0ff;
-            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333333;
+            border: 1px solid #cccccc;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -101,56 +107,54 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
         
         .fullscreen-btn:hover {
-            background: rgba(50, 50, 80, 0.9);
+            background: rgba(255, 255, 255, 1);
             transform: scale(1.1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         }
         
         .fullscreen-icon {
             width: 24px;
             height: 24px;
-            fill: #e0e0ff;
+            fill: #333333;
         }
         
-        /* Efeito de partículas para fundo cinematográfico */
-        .particles {
+        .controls-hint {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #333;
+            backdrop-filter: blur(5px);
+            transition: opacity 1s ease-in-out;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .controls-hint.hidden {
+            opacity: 0;
             pointer-events: none;
-            z-index: -1;
-        }
-        
-        .particle {
-            position: absolute;
-            background: rgba(100, 150, 255, 0.15);
-            border-radius: 50%;
-            animation: float 15s infinite linear;
-        }
-        
-        @keyframes float {
-            0% { transform: translateY(0) translateX(0); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <div class="particles" id="particles"></div>
-    
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p>Carregando modelo 3D...</p>
         <div class="progress-bar">
             <div class="progress" id="progress"></div>
         </div>
+    </div>
+    
+    <div class="controls-hint" id="controlsHint">
+        📱 Dois dedos para mover • Um dedo para girar
+        <br>
+        🖱️ Botão direito para mover • Botão esquerdo para girar
     </div>
     
     <button class="fullscreen-btn" id="fullscreenBtn" title="Tela Cheia">
@@ -174,12 +178,15 @@
         let model;
         let loadingTimeout;
         let isFullscreen = false;
+        let isPanning = false;
+        let touchStartDistance = 0;
+        let touchStartZoom = 0;
         
         // Inicializa a cena
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a14); // Fundo escuro azulado
+            scene.background = new THREE.Color(0xe0e0e0); // Fundo cinza claro
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -202,9 +209,6 @@
             // Inicializar relógio para animações
             clock = new THREE.Clock();
             
-            // Criar partículas para fundo cinematográfico
-            createParticles();
-            
             // Configurar timeout de segurança para esconder tela de carregamento
             loadingTimeout = setTimeout(() => {
                 hideLoadingScreen();
@@ -219,91 +223,209 @@
             // Configurar botão de tela cheia
             setupFullscreenButton();
             
+            // Esconder dicas de controles após alguns segundos
+            setTimeout(() => {
+                document.getElementById('controlsHint').classList.add('hidden');
+            }, 8000);
+            
             // Iniciar animação
             animate();
         }
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal (aumentada para objeto preto)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            // Luz ambiente principal
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
             scene.add(ambientLight);
             
             // Luz direcional principal (branca - frontal)
-            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.8);
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 2.0);
             directionalLight1.position.set(5, 8, 10);
-            directionalLight1.castShadow = true;
             scene.add(directionalLight1);
             
-            // Luz azul forte (lateral direita - 5x mais intensa)
-            const blueLight1 = new THREE.DirectionalLight(0x4488ff, 3.5);
-            blueLight1.position.set(10, 5, 5);
+            // Luzes azuis intensas
+            const blueLight1 = new THREE.DirectionalLight(0x3366ff, 6.0);
+            blueLight1.position.set(12, 6, 8);
             scene.add(blueLight1);
             
-            // Segunda luz azul (lateral esquerda)
-            const blueLight2 = new THREE.DirectionalLight(0x3377ff, 2.5);
-            blueLight2.position.set(-10, 5, 5);
+            const blueLight2 = new THREE.DirectionalLight(0x3366ff, 6.0);
+            blueLight2.position.set(-12, 6, 8);
             scene.add(blueLight2);
             
+            const blueLight3 = new THREE.DirectionalLight(0x4477ff, 5.0);
+            blueLight3.position.set(0, 15, 5);
+            scene.add(blueLight3);
+            
             // Luz branca traseira
-            const backLight = new THREE.DirectionalLight(0xffffff, 2.0);
-            backLight.position.set(0, 5, -10);
+            const backLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            backLight.position.set(0, 5, -12);
             scene.add(backLight);
             
-            // Luz de preenchimento inferior (azul suave)
-            const fillLight = new THREE.DirectionalLight(0x88aaff, 1.5);
-            fillLight.position.set(0, -10, 5);
-            scene.add(fillLight);
-            
-            // Luz de preenchimento superior (branca)
-            const topLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            topLight.position.set(0, 10, 5);
-            scene.add(topLight);
-            
-            // Luz hemisférica para iluminação ambiental
-            const hemisphereLight = new THREE.HemisphereLight(0x4477aa, 0x112233, 0.8);
-            scene.add(hemisphereLight);
-            
-            // Pontos de luz adicionais para destacar detalhes
-            const pointLight1 = new THREE.PointLight(0x4488ff, 1.5, 20);
-            pointLight1.position.set(8, 6, 8);
+            // Pontos de luz azuis
+            const pointLight1 = new THREE.PointLight(0x4477ff, 8.0, 25);
+            pointLight1.position.set(10, 8, 10);
             scene.add(pointLight1);
             
-            const pointLight2 = new THREE.PointLight(0x4488ff, 1.5, 20);
-            pointLight2.position.set(-8, 6, 8);
+            const pointLight2 = new THREE.PointLight(0x4477ff, 8.0, 25);
+            pointLight2.position.set(-10, 8, 10);
             scene.add(pointLight2);
+            
+            // Luz hemisférica azul para iluminação ambiental
+            const hemisphereLight = new THREE.HemisphereLight(0x5588ff, 0x224477, 1.2);
+            scene.add(hemisphereLight);
         }
         
-        // Criar partículas para efeito cinematográfico
-        function createParticles() {
-            const particlesContainer = document.getElementById('particles');
-            const particleCount = 30;
+        // Configurar controles de órbita
+        function setupControls() {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1; // Suavidade do movimento
+            controls.screenSpacePanning = true; // Permite panning livre
+            controls.minDistance = 0.1;
+            controls.maxDistance = 1000;
+            controls.rotateSpeed = 1.0;
+            controls.panSpeed = 0.8; // Velocidade de panning
+            controls.enablePan = true;
             
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('particle');
-                
-                // Posição e tamanho aleatórios
-                const size = Math.random() * 4 + 1;
-                const posX = Math.random() * 100;
-                const posY = Math.random() * 100 + 100; // Começa abaixo da tela
-                const delay = Math.random() * 15;
-                
-                particle.style.width = `${size}px`;
-                particle.style.height = `${size}px`;
-                particle.style.left = `${posX}%`;
-                particle.style.top = `${posY}%`;
-                particle.style.animationDelay = `${delay}s`;
-                
-                particlesContainer.appendChild(particle);
+            // Configurar foco inicial
+            if (model) {
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                controls.target.copy(center);
             }
+            
+            // Suavizar a transição quando o alvo muda
+            const originalUpdate = controls.update.bind(controls);
+            controls.update = function() {
+                // Suaviza a transição do target
+                controls.target.lerp(controls.target, 0.05);
+                return originalUpdate();
+            };
+            
+            controls.update();
+            
+            // Configurar eventos de toque para panning com dois dedos
+            setupTouchPanning();
+        }
+        
+        // Configurar panning com dois dedos para mobile
+        function setupTouchPanning() {
+            const canvas = renderer.domElement;
+            let touchStartPositions = [];
+            let isPinching = false;
+            
+            canvas.addEventListener('touchstart', (event) => {
+                // Mostrar dicas de controle
+                document.getElementById('controlsHint').classList.remove('hidden');
+                
+                if (event.touches.length === 2) {
+                    // Dois dedos - modo panning/zoom
+                    isPanning = true;
+                    isPinching = true;
+                    
+                    // Salvar posições iniciais dos toques
+                    touchStartPositions = [
+                        { x: event.touches[0].clientX, y: event.touches[0].clientY },
+                        { x: event.touches[1].clientX, y: event.touches[1].clientY }
+                    ];
+                    
+                    // Calcular distância inicial entre os dedos
+                    touchStartDistance = Math.hypot(
+                        touchStartPositions[1].x - touchStartPositions[0].x,
+                        touchStartPositions[1].y - touchStartPositions[0].y
+                    );
+                    
+                    touchStartZoom = camera.position.z;
+                    event.preventDefault();
+                }
+            });
+            
+            canvas.addEventListener('touchmove', (event) => {
+                if (event.touches.length === 2 && isPinching) {
+                    // Calcular nova distância entre os dedos
+                    const currentDistance = Math.hypot(
+                        event.touches[1].clientX - event.touches[0].clientX,
+                        event.touches[1].clientY - event.touches[0].clientY
+                    );
+                    
+                    // Zoom baseado na diferença de distância
+                    const zoomFactor = touchStartDistance / currentDistance;
+                    camera.position.z = touchStartZoom * zoomFactor;
+                    
+                    // Panning baseado no movimento médio dos dedos
+                    const currentMidX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                    const currentMidY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+                    
+                    const startMidX = (touchStartPositions[0].x + touchStartPositions[1].x) / 2;
+                    const startMidY = (touchStartPositions[0].y + touchStartPositions[1].y) / 2;
+                    
+                    const deltaX = (currentMidX - startMidX) * 0.01;
+                    const deltaY = (currentMidY - startMidY) * 0.01;
+                    
+                    // Mover a câmera e o target
+                    panCamera(deltaX, -deltaY);
+                    
+                    event.preventDefault();
+                }
+            });
+            
+            canvas.addEventListener('touchend', (event) => {
+                if (event.touches.length < 2) {
+                    isPanning = false;
+                    isPinching = false;
+                }
+            });
+            
+            // Configurar botão direito do mouse para panning
+            canvas.addEventListener('contextmenu', (event) => {
+                event.preventDefault(); // Prevenir menu de contexto
+            });
+            
+            canvas.addEventListener('mousedown', (event) => {
+                if (event.button === 2) { // Botão direito
+                    isPanning = true;
+                    canvas.classList.add('dragging');
+                    event.preventDefault();
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (event) => {
+                if (isPanning && event.buttons === 2) {
+                    const movementX = event.movementX || event.mozMovementX || 0;
+                    const movementY = event.movementY || event.mozMovementY || 0;
+                    
+                    panCamera(movementX * 0.01, movementY * 0.01);
+                }
+            });
+            
+            canvas.addEventListener('mouseup', (event) => {
+                if (event.button === 2) {
+                    isPanning = false;
+                    canvas.classList.remove('dragging');
+                }
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                isPanning = false;
+                canvas.classList.remove('dragging');
+            });
+        }
+        
+        // Função para mover a câmera suavemente
+        function panCamera(deltaX, deltaY) {
+            // Calcular a direção do movimento baseado na orientação da câmera
+            const panVector = new THREE.Vector3(-deltaX, deltaY, 0);
+            panVector.applyQuaternion(camera.quaternion);
+            
+            // Aplicar o movimento à câmera e ao alvo
+            camera.position.add(panVector);
+            controls.target.add(panVector);
         }
         
         // Configurar botão de tela cheia
         function setupFullscreenButton() {
             const fullscreenBtn = document.getElementById('fullscreenBtn');
             
-            // Suporte a diferentes navegadores
             const docElement = document.documentElement;
             const requestFullscreen = docElement.requestFullscreen || 
                                     docElement.mozRequestFullScreen || 
@@ -315,7 +437,6 @@
                                  document.webkitExitFullscreen || 
                                  document.msExitFullscreen;
             
-            // Verificar se o fullscreen é suportado
             if (!requestFullscreen) {
                 fullscreenBtn.style.display = 'none';
                 return;
@@ -331,7 +452,6 @@
                 }
             });
             
-            // Atualizar ícone quando entrar/sair do modo tela cheia
             document.addEventListener('fullscreenchange', updateFullscreenButton);
             document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
             document.addEventListener('mozfullscreenchange', updateFullscreenButton);
@@ -343,7 +463,6 @@
                                 document.mozFullScreenElement || 
                                 document.msFullscreenElement);
                 
-                // Atualizar ícone
                 const icon = fullscreenBtn.querySelector('.fullscreen-icon');
                 if (isFullscreen) {
                     icon.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
@@ -358,7 +477,6 @@
             const loader = new THREE.GLTFLoader();
             
             loader.load(url, function(gltf) {
-                // Limpar timeout se o modelo carregou antes
                 if (loadingTimeout) {
                     clearTimeout(loadingTimeout);
                 }
@@ -366,7 +484,6 @@
                 model = gltf.scene;
                 scene.add(model);
                 
-                // Configurar animações se existirem
                 if (gltf.animations && gltf.animations.length) {
                     mixer = new THREE.AnimationMixer(model);
                     gltf.animations.forEach((clip) => {
@@ -374,31 +491,21 @@
                     });
                 }
                 
-                // Centralizar e dimensionar o modelo
                 centerModel();
-                
-                // Configurar controles de órbita após o carregamento do modelo
                 setupControls();
-                
-                // Esconder tela de carregamento
                 hideLoadingScreen();
                 
             }, function(xhr) {
-                // Atualizar barra de progresso
                 const percentLoaded = (xhr.loaded / xhr.total) * 100;
                 document.getElementById('progress').style.width = percentLoaded + '%';
             }, function(error) {
                 console.error('Erro ao carregar o modelo:', error);
                 
-                // Limpar timeout em caso de erro
                 if (loadingTimeout) {
                     clearTimeout(loadingTimeout);
                 }
                 
-                // Esconder tela de carregamento mesmo em caso de erro
                 hideLoadingScreen();
-                
-                // Mostrar mensagem de erro
                 document.querySelector('.loading-overlay p').textContent = 
                     'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
             });
@@ -409,7 +516,6 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             loadingOverlay.classList.add('hidden');
             
-            // Remover completamente após a transição
             setTimeout(() => {
                 loadingOverlay.style.display = 'none';
             }, 500);
@@ -421,40 +527,19 @@
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             
-            // Calcular o ajuste de posição para centralizar
             model.position.x = -center.x;
             model.position.y = -center.y;
             model.position.z = -center.z;
             
-            // Ajustar a câmera para visualizar todo o modelo
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
             let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
             
-            // Ajustar a distância da câmera com base no tamanho do modelo
             cameraZ *= 1.5;
             
             camera.position.z = cameraZ;
             camera.far = Math.max(1000, cameraZ * 10);
             camera.updateProjectionMatrix();
-        }
-        
-        // Configurar controles de órbita
-        function setupControls() {
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
-            controls.screenSpacePanning = false;
-            controls.minDistance = 0.1;
-            controls.maxDistance = 1000;
-            controls.rotateSpeed = 1.0;
-            controls.enablePan = true;
-            
-            // Focar no centro do modelo
-            const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            controls.target.copy(center);
-            controls.update();
         }
         
         // Ajustar para redimensionamento da janela
@@ -468,15 +553,11 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // Atualizar animações do modelo
             if (mixer) {
                 mixer.update(clock.getDelta());
             }
             
-            if (controls) {
-                controls.update();
-            }
-            
+            controls.update();
             renderer.render(scene, camera);
         }
         
