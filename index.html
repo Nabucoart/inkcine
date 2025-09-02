@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(45deg, #2c3e50, #4ca1af);
+            background: linear-gradient(135deg, #2c3e50, #7f8c8d);
             height: 100vh;
         }
         
@@ -38,7 +38,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(30, 30, 30, 0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -100,7 +100,7 @@
     </style>
 </head>
 <body>
-    <div class="loading-overlay">
+    <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p>Carregando modelo 3D...</p>
         <div class="progress-bar">
@@ -116,8 +116,8 @@
         <canvas id="modelViewer"></canvas>
     </div>
 
-    <!-- Incluindo Three.js e controles -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <!-- Incluindo Three.js e controles com fallback para CDN alternativo -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
 
@@ -135,17 +135,17 @@
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
             camera.position.z = 5;
             
-            // Configurar renderizador
+            // Configurar renderizador com otimizações
             renderer = new THREE.WebGLRenderer({ 
                 canvas: document.getElementById('modelViewer'), 
-                antialias: true,
+                antialias: false, // Desativar antialiasing para melhor performance
                 alpha: true,
                 powerPreference: "high-performance"
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitar pixel ratio para performance
+            renderer.setPixelRatio(1); // Reduzir para melhor performance
             
-            // Configurar sistema de iluminação avançado
+            // Configurar sistema de iluminação
             setupLighting();
             
             // Inicializar relógio para animações
@@ -168,16 +168,16 @@
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal (muito mais forte)
+            // Luz ambiente principal
             const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
             scene.add(ambientLight);
             
-            // Luz direcional principal (como sol)
+            // Luz direcional principal
             const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
             directionalLight.position.set(5, 10, 7);
             scene.add(directionalLight);
             
-            // Luz de preenchimento para reduzir sombras escuras
+            // Luz de preenchimento
             const fillLight = new THREE.DirectionalLight(0x7777ff, 1.5);
             fillLight.position.set(-5, 5, 5);
             scene.add(fillLight);
@@ -186,17 +186,20 @@
             const backLight = new THREE.DirectionalLight(0xffffff, 1.2);
             backLight.position.set(0, 0, -10);
             scene.add(backLight);
-            
-            // Luz hemisférica para iluminação ambiental natural
-            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.0);
-            scene.add(hemisphereLight);
         }
         
         // Carregar modelo 3D
         function loadModel(url) {
             const loader = new THREE.GLTFLoader();
             
+            // Forçar limpar a tela de carregamento após um tempo máximo (fallback)
+            const loadingTimeout = setTimeout(() => {
+                hideLoadingScreen();
+            }, 10000); // 10 segundos máximo de carregamento
+            
             loader.load(url, function(gltf) {
+                clearTimeout(loadingTimeout); // Cancelar o timeout se carregou antes
+                
                 model = gltf.scene;
                 scene.add(model);
                 
@@ -214,21 +217,27 @@
                 // Configurar controles de órbita após o carregamento do modelo
                 setupControls();
                 
-                // Esconder tela de carregamento com transição suave
-                setTimeout(() => {
-                    document.querySelector('.loading-overlay').style.opacity = '0';
-                    setTimeout(() => {
-                        document.querySelector('.loading-overlay').style.display = 'none';
-                    }, 500);
-                }, 500);
+                // Esconder tela de carregamento
+                hideLoadingScreen();
                 
             }, function(xhr) {
                 // Atualizar barra de progresso
                 const percentLoaded = (xhr.loaded / xhr.total) * 100;
                 document.getElementById('progress').style.width = percentLoaded + '%';
             }, function(error) {
+                clearTimeout(loadingTimeout);
                 console.error('Erro ao carregar o modelo:', error);
+                hideLoadingScreen();
             });
+        }
+        
+        // Esconder tela de carregamento
+        function hideLoadingScreen() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 500);
         }
         
         // Centralizar e dimensionar o modelo
@@ -248,7 +257,7 @@
             let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
             
             // Ajustar a distância da câmera com base no tamanho do modelo
-            cameraZ *= 1.5; // Ajuste para garantir que o modelo caiba na visualização
+            cameraZ *= 1.5;
             
             camera.position.z = cameraZ;
             camera.far = Math.max(1000, cameraZ * 10);
@@ -264,8 +273,8 @@
             controls.enableDamping = true;
             controls.dampingFactor = 0.1;
             controls.screenSpacePanning = false;
-            controls.minDistance = 0.1; // Zoom muito mais próximo
-            controls.maxDistance = 1000; // Zoom muito mais distante
+            controls.minDistance = 0.1;
+            controls.maxDistance = 1000;
             controls.rotateSpeed = 1.0;
             controls.enablePan = true;
             
