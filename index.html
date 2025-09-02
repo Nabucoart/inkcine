@@ -14,10 +14,9 @@
         body {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            background: #e0e0e0; /* Cinza claro */
+            background: #e0e0e0;
             height: 100vh;
             width: 100vw;
-            touch-action: none; /* Impede comportamentos padrão de toque */
         }
         
         #canvas-container {
@@ -32,6 +31,11 @@
             display: block;
             width: 100%;
             height: 100%;
+            cursor: grab;
+        }
+        
+        #modelViewer.dragging {
+            cursor: grabbing;
         }
         
         .loading-overlay {
@@ -150,15 +154,15 @@
         let isFullscreen = false;
         let raycaster = new THREE.Raycaster();
         let mouse = new THREE.Vector2();
-        let touchStart = { x: 0, y: 0 };
-        let isDragging = false;
         let orbitPoint = new THREE.Vector3();
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
         
         // Inicializa a cena
         function init() {
             // Configurar cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xe0e0e0); // Cinza claro
+            scene.background = new THREE.Color(0xe0e0e0);
             
             // Configurar câmera
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -195,7 +199,10 @@
             // Configurar botão de tela cheia
             setupFullscreenButton();
             
-            // Configurar eventos de toque e mouse
+            // Configurar controles de órbita
+            setupControls();
+            
+            // Configurar eventos de interação
             setupInteraction();
             
             // Iniciar animação
@@ -204,7 +211,7 @@
         
         // Configurar sistema de iluminação
         function setupLighting() {
-            // Luz ambiente principal (aumentada)
+            // Luz ambiente principal
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
             scene.add(ambientLight);
             
@@ -213,52 +220,51 @@
             directionalLight1.position.set(5, 8, 10);
             scene.add(directionalLight1);
             
-            // LUZES AZUIS INTENSIFICADAS (aumentadas significativamente)
-            
-            // Luz azul forte (lateral direita - MUITO intensa)
-            const blueLight1 = new THREE.DirectionalLight(0x3366ff, 6.0); // Intensidade aumentada
+            // Luzes azuis intensas
+            const blueLight1 = new THREE.DirectionalLight(0x3366ff, 6.0);
             blueLight1.position.set(12, 6, 8);
             scene.add(blueLight1);
             
-            // Segunda luz azul (lateral esquerda - MUITO intensa)
-            const blueLight2 = new THREE.DirectionalLight(0x3366ff, 6.0); // Intensidade aumentada
+            const blueLight2 = new THREE.DirectionalLight(0x3366ff, 6.0);
             blueLight2.position.set(-12, 6, 8);
             scene.add(blueLight2);
             
-            // Terceira luz azul (superior - MUITO intensa)
-            const blueLight3 = new THREE.DirectionalLight(0x4477ff, 5.0); // Intensidade aumentada
+            const blueLight3 = new THREE.DirectionalLight(0x4477ff, 5.0);
             blueLight3.position.set(0, 15, 5);
             scene.add(blueLight3);
-            
-            // Quarta luz azul (inferior - intensa)
-            const blueLight4 = new THREE.DirectionalLight(0x5588ff, 4.0); // Intensidade aumentada
-            blueLight4.position.set(0, -12, 5);
-            scene.add(blueLight4);
             
             // Luz branca traseira
             const backLight = new THREE.DirectionalLight(0xffffff, 2.5);
             backLight.position.set(0, 5, -12);
             scene.add(backLight);
             
-            // Pontos de luz azuis adicionais para destacar detalhes (MUITO intensos)
-            const pointLight1 = new THREE.PointLight(0x4477ff, 8.0, 25); // Intensidade aumentada
+            // Pontos de luz azuis
+            const pointLight1 = new THREE.PointLight(0x4477ff, 8.0, 25);
             pointLight1.position.set(10, 8, 10);
             scene.add(pointLight1);
             
-            const pointLight2 = new THREE.PointLight(0x4477ff, 8.0, 25); // Intensidade aumentada
+            const pointLight2 = new THREE.PointLight(0x4477ff, 8.0, 25);
             pointLight2.position.set(-10, 8, 10);
             scene.add(pointLight2);
-            
-            const pointLight3 = new THREE.PointLight(0x4477ff, 6.0, 20); // Intensidade aumentada
-            pointLight3.position.set(0, -5, 8);
-            scene.add(pointLight3);
             
             // Luz hemisférica azul para iluminação ambiental
             const hemisphereLight = new THREE.HemisphereLight(0x5588ff, 0x224477, 1.2);
             scene.add(hemisphereLight);
         }
         
-        // Configurar interação por toque e mouse
+        // Configurar controles de órbita
+        function setupControls() {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 0.1;
+            controls.maxDistance = 1000;
+            controls.rotateSpeed = 1.0;
+            controls.enablePan = true;
+        }
+        
+        // Configurar interação
         function setupInteraction() {
             const canvas = renderer.domElement;
             
@@ -266,6 +272,7 @@
             canvas.addEventListener('mousedown', onMouseDown);
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('mouseleave', onMouseUp);
             
             // Eventos de toque
             canvas.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -274,7 +281,7 @@
             
             // Prevenir scroll padrão na tela
             document.addEventListener('touchmove', function(e) {
-                if (isDragging) {
+                if (isDragging && e.touches.length === 1) {
                     e.preventDefault();
                 }
             }, { passive: false });
@@ -295,32 +302,45 @@
                 }
             }
             
-            // Se não encontrar interseção, retorna um ponto na direção do raio
-            const distance = 10;
-            const direction = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(camera).sub(camera.position).normalize();
-            return camera.position.clone().add(direction.multiplyScalar(distance));
+            // Se não encontrar interseção, retorna o centro do modelo ou da cena
+            if (model) {
+                const box = new THREE.Box3().setFromObject(model);
+                return box.getCenter(new THREE.Vector3());
+            }
+            
+            return new THREE.Vector3(0, 0, 0);
         }
         
         // Manipuladores de eventos de mouse
         function onMouseDown(event) {
+            if (event.button !== 0) return; // Apenas botão esquerdo
+            
             isDragging = true;
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+            
+            // Encontrar ponto de interseção para orbitar
             orbitPoint = findIntersection(event.clientX, event.clientY);
-            controls.enabled = false;
+            controls.target.copy(orbitPoint);
+            
+            // Atualizar cursor
+            canvas.classList.add('dragging');
         }
         
         function onMouseMove(event) {
             if (!isDragging) return;
             
-            const deltaX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-            const deltaY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+            const deltaX = event.clientX - previousMousePosition.x;
+            const deltaY = event.clientY - previousMousePosition.y;
             
-            // Rotacionar em torno do ponto de órbita
-            rotateAroundPoint(deltaX * 0.01, deltaY * 0.01, orbitPoint);
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+            
+            // Rotacionar a câmera em torno do ponto de órbita
+            rotateCameraAroundPoint(deltaX * 0.01, deltaY * 0.01, orbitPoint);
         }
         
         function onMouseUp() {
             isDragging = false;
-            controls.enabled = true;
+            canvas.classList.remove('dragging');
         }
         
         // Manipuladores de eventos de toque
@@ -329,10 +349,11 @@
                 event.preventDefault();
                 isDragging = true;
                 const touch = event.touches[0];
-                touchStart.x = touch.clientX;
-                touchStart.y = touch.clientY;
+                previousMousePosition = { x: touch.clientX, y: touch.clientY };
+                
+                // Encontrar ponto de interseção para orbitar
                 orbitPoint = findIntersection(touch.clientX, touch.clientY);
-                controls.enabled = false;
+                controls.target.copy(orbitPoint);
             }
         }
         
@@ -340,24 +361,22 @@
             if (event.touches.length === 1 && isDragging) {
                 event.preventDefault();
                 const touch = event.touches[0];
-                const deltaX = touch.clientX - touchStart.x;
-                const deltaY = touch.clientY - touchStart.y;
+                const deltaX = touch.clientX - previousMousePosition.x;
+                const deltaY = touch.clientY - previousMousePosition.y;
                 
-                // Rotacionar em torno do ponto de órbita
-                rotateAroundPoint(deltaX * 0.01, deltaY * 0.01, orbitPoint);
+                previousMousePosition = { x: touch.clientX, y: touch.clientY };
                 
-                touchStart.x = touch.clientX;
-                touchStart.y = touch.clientY;
+                // Rotacionar a câmera em torno do ponto de órbita
+                rotateCameraAroundPoint(deltaX * 0.01, deltaY * 0.01, orbitPoint);
             }
         }
         
         function onTouchEnd() {
             isDragging = false;
-            controls.enabled = true;
         }
         
         // Rotacionar a câmera em torno de um ponto específico
-        function rotateAroundPoint(deltaX, deltaY, point) {
+        function rotateCameraAroundPoint(deltaX, deltaY, point) {
             // Calcular o vetor da câmera para o ponto
             const offset = new THREE.Vector3().subVectors(camera.position, point);
             
@@ -377,13 +396,13 @@
             camera.lookAt(point);
             
             // Atualizar controles
-            controls.target.copy(point);
             controls.update();
         }
         
         // Configurar botão de tela cheia
         function setupFullscreenButton() {
             const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const canvas = document.getElementById('modelViewer');
             
             // Suporte a diferentes navegadores
             const docElement = document.documentElement;
@@ -459,9 +478,6 @@
                 // Centralizar e dimensionar o modelo
                 centerModel();
                 
-                // Configurar controles de órbita após o carregamento do modelo
-                setupControls();
-                
                 // Esconder tela de carregamento
                 hideLoadingScreen();
                 
@@ -519,22 +535,8 @@
             camera.position.z = cameraZ;
             camera.far = Math.max(1000, cameraZ * 10);
             camera.updateProjectionMatrix();
-        }
-        
-        // Configurar controles de órbita
-        function setupControls() {
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
-            controls.screenSpacePanning = false;
-            controls.minDistance = 0.1;
-            controls.maxDistance = 1000;
-            controls.rotateSpeed = 1.0;
-            controls.enablePan = true;
             
-            // Focar no centro do modelo
-            const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
+            // Definir o alvo inicial dos controles
             controls.target.copy(center);
             controls.update();
         }
@@ -555,9 +557,7 @@
                 mixer.update(clock.getDelta());
             }
             
-            if (controls && controls.enabled) {
-                controls.update();
-            }
+            controls.update();
             
             renderer.render(scene, camera);
         }
