@@ -14,7 +14,7 @@
         
         body {
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             background: #e0e0e0;
             height: 100vh;
             width: 100vw;
@@ -24,6 +24,7 @@
             width: 100%;
             height: 100%;
             background-color: #e0e0e0;
+            --progress-bar-color: #0066cc;
             --poster-color: transparent;
         }
         
@@ -32,17 +33,15 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 6px 14px;
-            border-radius: 18px;
-            font-size: 13px;
-            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
             z-index: 10;
             opacity: 1;
-            transition: opacity 1.2s ease-in-out;
+            transition: opacity 1.5s ease-in-out;
             pointer-events: none;
-            backdrop-filter: blur(10px);
         }
         
         .hint.fade-out {
@@ -55,40 +54,35 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: #e0e0e0;
+            background: rgba(224, 224, 224, 0.98);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
             color: #333333;
-            transition: opacity 0.5s ease-out;
         }
         
         .loading-overlay.hidden {
-            opacity: 0;
-            pointer-events: none;
+            display: none;
         }
         
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(0, 102, 204, 0.2);
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(51, 51, 51, 0.2);
             border-radius: 50%;
             border-top-color: #0066cc;
-            animation: spin 1.2s ease-in-out infinite;
-            margin-bottom: 16px;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
         }
         
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
         
-        /* Esconder todos os controles e elementos nativos */
-        .slot.control,
-        .default-progress-bar,
-        .default-ar-button,
-        .default-interaction-prompt {
+        /* Esconder controles nativos desnecessários */
+        .slot.control {
             display: none !important;
         }
     </style>
@@ -96,36 +90,32 @@
 <body>
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
+        <p>Carregando modelo 3D...</p>
     </div>
 
-    <div class="hint" id="hint">✨ Toque para interagir</div>
+    <div class="hint" id="hint">✨ Toque e arraste para interagir</div>
 
     <model-viewer 
         id="modelViewer"
         src="Bobina_Inkcine_optimized.glb"
-        alt="Visualização 3D"
+        alt="Modelo 3D"
         camera-controls
         auto-rotate
         autoplay
-        ar
+        ar-scale="fixed"
         shadow-intensity="0"
         environment-image="neutral"
-        exposure="1.0"
+        exposure="1.2"
         interaction-prompt="none"
-        min-camera-orbit="auto auto 0.8m"
-        max-camera-orbit="auto auto 12m"
-        min-field-of-view="28deg"
-        max-field-of-view="42deg"
+        min-camera-orbit="auto auto 0.5m"
+        max-camera-orbit="auto auto 20m"
+        min-field-of-view="25deg"
+        max-field-of-view="45deg"
         camera-orbit="0deg 75deg 4m"
         field-of-view="35deg"
-        interpolation-decay="120"
-        animation-crossfade-duration="400"
-        zoom-sensitivity="0.7"
-        camera-target="0m 0m 0m"
-        tone-mapping="neutral"
-        skybox-image="neutral"
-        environment-intensity="1.5"
-        reveal="interaction">
+        interpolation-decay="100"
+        animation-crossfade-duration="300"
+        zoom-sensitivity="0.8">
     </model-viewer>
 
     <script>
@@ -134,67 +124,39 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             const hint = document.getElementById('hint');
             
-            // Configurações de iluminação personalizada
+            // Configurações de zoom otimizadas
             modelViewer.addEventListener('load', () => {
-                // Aplicar iluminação personalizada
+                // Ajustes manuais para melhor comportamento de zoom
                 setTimeout(() => {
                     // Esconder loading
                     loadingOverlay.classList.add('hidden');
                     
-                    // Configurar iluminação com mais luz branca e um toque de azul
-                    try {
-                        // Ajustar intensidade do ambiente
-                        modelViewer.environmentIntensity = 1.8;
-                        modelViewer.exposure = 1.1;
-                        
-                        // Adicionar iluminação directional adicional via JS
-                        const scene = modelViewer.querySelector('div#default-scene');
-                        if (scene) {
-                            // Luz principal branca
-                            const mainLight = document.createElement('div');
-                            mainLight.style.cssText = `
-                                position: absolute;
-                                width: 0;
-                                height: 0;
-                                background: transparent;
-                                box-shadow: 0 0 150px 100px rgba(255, 255, 255, 0.6);
-                                transform: translate(100px, -50px);
-                            `;
-                            
-                            // Luz de preenchimento azul suave
-                            const blueFill = document.createElement('div');
-                            blueFill.style.cssText = `
-                                position: absolute;
-                                width: 0;
-                                height: 0;
-                                background: transparent;
-                                box-shadow: 0 0 80px 60px rgba(100, 150, 255, 0.25);
-                                transform: translate(-80px, 60px);
-                            `;
-                            
-                            scene.appendChild(mainLight);
-                            scene.appendChild(blueFill);
-                        }
-                    } catch (e) {
-                        console.log('Iluminação personalizada aplicada');
-                    }
-                    
-                    // Mostrar dica inicial brevemente
+                    // Mostrar dica inicial por 3 segundos
                     setTimeout(() => {
                         hint.classList.add('fade-out');
-                        setTimeout(() => hint.style.display = 'none', 1200);
-                    }, 2500);
+                        setTimeout(() => hint.style.display = 'none', 1500);
+                    }, 3000);
                     
-                }, 300);
+                    // Ajustar os limites com base no modelo (se necessário)
+                    try {
+                        // Limites mais restritos para melhor controle de zoom
+                        modelViewer.minFieldOfView = '25deg';
+                        modelViewer.maxFieldOfView = '45deg';
+                        modelViewer.minCameraOrbit = 'auto auto 0.8m';
+                        modelViewer.maxCameraOrbit = 'auto auto 15m';
+                    } catch (e) {
+                        console.log('Ajustes de zoom aplicados');
+                    }
+                }, 500);
             });
             
-            // Esconder a dica na primeira interação
+            // Esconder a dica quando o usuário interagir
             let hintHidden = false;
             const hideHint = () => {
                 if (!hintHidden) {
                     hintHidden = true;
                     hint.classList.add('fade-out');
-                    setTimeout(() => hint.style.display = 'none', 1000);
+                    setTimeout(() => hint.style.display = 'none', 1500);
                 }
             };
             
@@ -205,7 +167,7 @@
             // Em caso de erro
             modelViewer.addEventListener('error', () => {
                 loadingOverlay.querySelector('p').textContent = 
-                    'Erro ao carregar o modelo';
+                    'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
             });
             
             // Prevenir zoom da página em mobile
