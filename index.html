@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizador 3D</title>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -18,24 +17,26 @@
             background: #e0e0e0;
             height: 100vh;
             width: 100vw;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            touch-action: none;
         }
         
-        .container {
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            max-width: 100%;
-            max-height: 100vh;
-            position: relative;
         }
         
-        model-viewer {
+        #modelViewer {
+            display: block;
             width: 100%;
             height: 100%;
-            background-color: #e0e0e0;
-            --progress-bar-color: #0066cc;
+            cursor: grab;
+        }
+        
+        #modelViewer.dragging {
+            cursor: grabbing;
         }
         
         .loading-overlay {
@@ -74,17 +75,17 @@
         }
         
         .controls-container {
-            position: absolute;
+            position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             gap: 10px;
             background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
+            padding: 12px 20px;
             border-radius: 50px;
             backdrop-filter: blur(10px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             z-index: 10;
         }
         
@@ -101,6 +102,7 @@
             transition: all 0.3s;
             color: #333;
             font-size: 20px;
+            font-weight: bold;
         }
         
         .control-btn:hover {
@@ -108,22 +110,17 @@
             transform: scale(1.1);
         }
         
-        .control-btn:active {
-            background: rgba(0, 102, 204, 0.2);
-            transform: scale(0.95);
-        }
-        
         .instructions {
-            position: absolute;
+            position: fixed;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.9);
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 25px;
             font-size: 14px;
             backdrop-filter: blur(10px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             z-index: 10;
             text-align: center;
             transition: opacity 0.5s ease-in-out;
@@ -138,7 +135,13 @@
             .instructions {
                 top: 10px;
                 font-size: 12px;
-                padding: 8px 16px;
+                padding: 10px 18px;
+                max-width: 90%;
+            }
+            
+            .controls-container {
+                bottom: 15px;
+                padding: 10px 16px;
             }
             
             .control-btn {
@@ -152,120 +155,316 @@
 <body>
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p>Carregando visualizador 3D...</p>
+        <p>Carregando modelo 3D...</p>
     </div>
 
     <div class="instructions" id="instructions">
-        📱 Toque e arraste para girar • Dois dedos para mover/zoom
+        📱 Um dedo para girar • Dois dedos para zoom e mover
         <br>
-        🖱️ Arraste para girar • Scroll para zoom • Botão direito para mover
+        🖱️ Botão esquerdo para girar • Scroll para zoom • Botão direito para mover
     </div>
 
-    <div class="container">
-        <model-viewer 
-            id="modelViewer"
-            src="Bobina_Inkcine_optimized.glb"
-            alt="Modelo 3D da Bobina Inkcine"
-            camera-controls
-            auto-rotate
-            auto-rotate-delay="1000"
-            ar-scale="fixed"
-            shadow-intensity="1.2"
-            environment-image="neutral"
-            exposure="1.0"
-            interaction-prompt="none"
-            min-camera-orbit="auto auto 0.1m"
-            max-camera-orbit="auto auto 1000m"
-            min-field-of-view="15deg"
-            max-field-of-view="65deg"
-            camera-orbit="0deg 75deg 5m"
-            field-of-view="45deg"
-            interpolation-decay="200">
-            
-            <div class="controls-container" slot="controls">
-                <button class="control-btn" id="resetView" title="Resetar Vista">↺</button>
-                <button class="control-btn" id="zoomIn" title="Zoom In">+</button>
-                <button class="control-btn" id="zoomOut" title="Zoom Out">-</button>
-                <button class="control-btn" id="toggleAutoRotate" title="Rotação Automática">🔄</button>
-            </div>
-        </model-viewer>
+    <div class="controls-container">
+        <button class="control-btn" id="resetView" title="Resetar Vista">↺</button>
+        <button class="control-btn" id="zoomIn" title="Zoom In">+</button>
+        <button class="control-btn" id="zoomOut" title="Zoom Out">-</button>
     </div>
+    
+    <div id="canvas-container">
+        <canvas id="modelViewer"></canvas>
+    </div>
+
+    <!-- Three.js e controles -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const modelViewer = document.getElementById('modelViewer');
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            const instructions = document.getElementById('instructions');
+        // Variáveis globais
+        let scene, camera, renderer, controls, mixer, clock;
+        let model, modelSize;
+        let loadingTimeout;
+        
+        // Inicializa a cena
+        function init() {
+            // Configurar cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xe0e0e0);
+            
+            // Configurar câmera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // Configurar renderizador
+            const canvas = document.getElementById('modelViewer');
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: canvas, 
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            // Configurar sistema de iluminação
+            setupLighting();
+            
+            // Inicializar relógio para animações
+            clock = new THREE.Clock();
+            
+            // Configurar timeout de segurança para esconder tela de carregamento
+            loadingTimeout = setTimeout(() => {
+                hideLoadingScreen();
+            }, 15000);
+            
+            // Carregar modelo
+            loadModel('Bobina_Inkcine_optimized.glb');
+            
+            // Ajustar para redimensionamento da janela
+            window.addEventListener('resize', onWindowResize);
             
             // Configurar botões de controle
-            document.getElementById('resetView').addEventListener('click', () => {
-                modelViewer.cameraOrbit = '0deg 75deg 5m';
-                modelViewer.fieldOfView = '45deg';
-            });
-            
-            document.getElementById('zoomIn').addEventListener('click', () => {
-                modelViewer.fieldOfView = Math.max(15, modelViewer.fieldOfView - 5) + 'deg';
-            });
-            
-            document.getElementById('zoomOut').addEventListener('click', () => {
-                modelViewer.fieldOfView = Math.min(65, modelViewer.fieldOfView + 5) + 'deg';
-            });
-            
-            document.getElementById('toggleAutoRotate').addEventListener('click', () => {
-                modelViewer.autoRotate = !modelViewer.autoRotate;
-            });
+            setupControls();
             
             // Esconder instruções após alguns segundos
             setTimeout(() => {
-                instructions.classList.add('hidden');
+                document.getElementById('instructions').classList.add('hidden');
             }, 8000);
             
-            // Mostrar instruções quando o mouse se mover
-            document.addEventListener('mousemove', () => {
-                instructions.classList.remove('hidden');
-                clearTimeout(instructions.hideTimeout);
-                instructions.hideTimeout = setTimeout(() => {
-                    instructions.classList.add('hidden');
-                }, 3000);
-            });
+            // Iniciar animação
+            animate();
+        }
+        
+        // Configurar sistema de iluminação
+        function setupLighting() {
+            // Luz ambiente principal
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+            scene.add(ambientLight);
             
-            // Mostrar instruções quando tocar na tela
-            document.addEventListener('touchstart', () => {
-                instructions.classList.remove('hidden');
-                clearTimeout(instructions.hideTimeout);
-                instructions.hideTimeout = setTimeout(() => {
-                    instructions.classList.add('hidden');
-                }, 3000);
-            });
+            // Luz direcional principal (branca - frontal)
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 2.0);
+            directionalLight1.position.set(5, 8, 10);
+            scene.add(directionalLight1);
             
-            // Quando o modelo carregar
-            modelViewer.addEventListener('load', () => {
-                setTimeout(() => {
-                    loadingOverlay.classList.add('hidden');
-                }, 500);
+            // Luzes azuis intensas
+            const blueLight1 = new THREE.DirectionalLight(0x3366ff, 6.0);
+            blueLight1.position.set(12, 6, 8);
+            scene.add(blueLight1);
+            
+            const blueLight2 = new THREE.DirectionalLight(0x3366ff, 6.0);
+            blueLight2.position.set(-12, 6, 8);
+            scene.add(blueLight2);
+            
+            const blueLight3 = new THREE.DirectionalLight(0x4477ff, 5.0);
+            blueLight3.position.set(0, 15, 5);
+            scene.add(blueLight3);
+            
+            // Luz branca traseira
+            const backLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            backLight.position.set(0, 5, -12);
+            scene.add(backLight);
+            
+            // Pontos de luz azuis
+            const pointLight1 = new THREE.PointLight(0x4477ff, 8.0, 25);
+            pointLight1.position.set(10, 8, 10);
+            scene.add(pointLight1);
+            
+            const pointLight2 = new THREE.PointLight(0x4477ff, 8.0, 25);
+            pointLight2.position.set(-10, 8, 10);
+            scene.add(pointLight2);
+            
+            // Luz hemisférica azul para iluminação ambiental
+            const hemisphereLight = new THREE.HemisphereLight(0x5588ff, 0x224477, 1.2);
+            scene.add(hemisphereLight);
+        }
+        
+        // Configurar controles
+        function setupControls() {
+            // Configurar controles de órbita
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = true;
+            controls.rotateSpeed = 1.0;
+            controls.panSpeed = 1.0;
+            controls.enablePan = true;
+            
+            // Limites de zoom otimizados (serão ajustados após carregar o modelo)
+            controls.minDistance = 0.5;
+            controls.maxDistance = 50;
+            
+            // Configurar botões de interface
+            document.getElementById('resetView').addEventListener('click', resetView);
+            document.getElementById('zoomIn').addEventListener('click', () => zoom(0.5));
+            document.getElementById('zoomOut').addEventListener('click', () => zoom(-0.5));
+            
+            // Mostrar instruções quando interagir
+            renderer.domElement.addEventListener('mousedown', showInstructions);
+            renderer.domElement.addEventListener('touchstart', showInstructions);
+        }
+        
+        // Função de zoom suave
+        function zoom(delta) {
+            const distance = controls.getDistance();
+            const newDistance = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance - delta));
+            
+            // Zoom suave
+            controls.target0.copy(controls.target);
+            controls.position0.copy(camera.position);
+            controls.zoomTo(newDistance / distance);
+        }
+        
+        // Resetar a visualização
+        function resetView() {
+            if (!model) return;
+            
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Calcular distância ideal da câmera
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+            
+            // Definir limites de zoom baseados no tamanho do modelo
+            controls.minDistance = maxDim * 0.5;
+            controls.maxDistance = maxDim * 10;
+            
+            // Posicionar câmera
+            camera.position.set(0, 0, cameraZ);
+            controls.target.copy(center);
+            controls.update();
+        }
+        
+        // Mostrar instruções temporariamente
+        function showInstructions() {
+            const instructions = document.getElementById('instructions');
+            instructions.classList.remove('hidden');
+            clearTimeout(instructions.hideTimeout);
+            instructions.hideTimeout = setTimeout(() => {
+                instructions.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Carregar modelo 3D
+        function loadModel(url) {
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(url, function(gltf) {
+                if (loadingTimeout) {
+                    clearTimeout(loadingTimeout);
+                }
                 
-                // Configurações adicionais após o carregamento
-                modelViewer.addEventListener('click', (event) => {
-                    // Pequeno feedback visual ao tocar/clicar
-                    event.currentTarget.style.transform = 'scale(0.99)';
-                    setTimeout(() => {
-                        event.currentTarget.style.transform = 'scale(1)';
-                    }, 100);
-                });
-            });
-            
-            // Em caso de erro
-            modelViewer.addEventListener('error', () => {
-                loadingOverlay.querySelector('p').textContent = 
+                model = gltf.scene;
+                scene.add(model);
+                
+                // Configurar animações se existirem
+                if (gltf.animations && gltf.animations.length) {
+                    mixer = new THREE.AnimationMixer(model);
+                    for (let i = 0; i < gltf.animations.length; i++) {
+                        mixer.clipAction(gltf.animations[i]).play();
+                    }
+                }
+                
+                // Centralizar e dimensionar o modelo
+                centerModel();
+                
+                // Configurar limites de zoom baseados no tamanho do modelo
+                setupZoomLimits();
+                
+                // Esconder tela de carregamento
+                hideLoadingScreen();
+                
+            }, function(xhr) {
+                // Barra de progresso
+                const percentLoaded = (xhr.loaded / xhr.total) * 100;
+                document.querySelector('.loading-overlay p').textContent = 
+                    `Carregando modelo 3D... ${Math.round(percentLoaded)}%`;
+            }, function(error) {
+                console.error('Erro ao carregar o modelo:', error);
+                
+                if (loadingTimeout) {
+                    clearTimeout(loadingTimeout);
+                }
+                
+                hideLoadingScreen();
+                document.querySelector('.loading-overlay p').textContent = 
                     'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
             });
+        }
+        
+        // Centralizar e dimensionar o modelo
+        function centerModel() {
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
             
-            // Prevenir que a página seja arrastada no mobile
-            document.addEventListener('touchmove', function(event) {
-                if (event.touches.length > 1) {
-                    event.preventDefault();
-                }
-            }, { passive: false });
+            // Salvar tamanho do modelo para referência
+            modelSize = size;
+            
+            // Centralizar o modelo
+            model.position.x = -center.x;
+            model.position.y = -center.y;
+            model.position.z = -center.z;
+            
+            // Posicionar câmera
+            resetView();
+        }
+        
+        // Configurar limites de zoom baseados no tamanho do modelo
+        function setupZoomLimits() {
+            if (!modelSize) return;
+            
+            const maxDim = Math.max(modelSize.x, modelSize.y, modelSize.z);
+            controls.minDistance = maxDim * 0.5;  // Zoom até metade do tamanho do modelo
+            controls.maxDistance = maxDim * 8;    // Zoom out até 8x o tamanho do modelo
+        }
+        
+        // Esconder tela de carregamento
+        function hideLoadingScreen() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.classList.add('hidden');
+            
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 500);
+        }
+        
+        // Ajustar para redimensionamento da janela
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Animação
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Atualizar animações do modelo
+            if (mixer) {
+                mixer.update(clock.getDelta());
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Iniciar quando a página carregar
+        window.addEventListener('load', init);
+        
+        // Prevenir gestos de zoom da página em dispositivos móveis
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('gesturechange', function(e) {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('gestureend', function(e) {
+            e.preventDefault();
         });
     </script>
 </body>
