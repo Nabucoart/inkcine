@@ -4,28 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizador 3D</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body, html {
+        * {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
+            box-sizing: border-box;
+        }
+        
+        body {
             overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
             background: #e0e0e0;
+            height: 100vh;
+            width: 100vw;
         }
         
-        #canvas-container {
-            position: fixed;
-            top: 0;
-            left: 0;
+        model-viewer {
             width: 100%;
             height: 100%;
-        }
-        
-        #modelViewer {
-            display: block;
-            width: 100%;
-            height: 100%;
+            background-color: #e0e0e0;
+            --progress-bar-color: #0066cc;
+            --poster-color: transparent;
         }
         
         .hint {
@@ -40,99 +40,142 @@
             font-size: 14px;
             z-index: 10;
             opacity: 1;
-            transition: opacity 1s ease-in-out;
+            transition: opacity 1.5s ease-in-out;
             pointer-events: none;
         }
         
         .hint.fade-out {
             opacity: 0;
         }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(224, 224, 224, 0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #333333;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(51, 51, 51, 0.2);
+            border-radius: 50%;
+            border-top-color: #0066cc;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Esconder controles nativos desnecessários */
+        .slot.control {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <div class="hint" id="hint">✨ Toque para interagir</div>
-    
-    <div id="canvas-container">
-        <canvas id="modelViewer"></canvas>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p>Carregando modelo 3D...</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <div class="hint" id="hint">✨ Toque e arraste para interagir</div>
+
+    <model-viewer 
+        id="modelViewer"
+        src="Bobina_Inkcine_optimized.glb"
+        alt="Modelo 3D"
+        camera-controls
+        auto-rotate
+        autoplay
+        ar-scale="fixed"
+        shadow-intensity="0"
+        environment-image="neutral"
+        exposure="1.2"
+        interaction-prompt="none"
+        min-camera-orbit="auto auto 0.5m"
+        max-camera-orbit="auto auto 20m"
+        min-field-of-view="25deg"
+        max-field-of-view="45deg"
+        camera-orbit="0deg 75deg 4m"
+        field-of-view="35deg"
+        interpolation-decay="100"
+        animation-crossfade-duration="300"
+        zoom-sensitivity="0.8">
+    </model-viewer>
 
     <script>
-        // Configuração mínima do Three.js
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xe0e0e0);
-        
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
-        
-        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('modelViewer'), antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        
-        // Iluminação principal branca com toque azul
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-        scene.add(ambientLight);
-        
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        directionalLight.position.set(5, 8, 10);
-        scene.add(directionalLight);
-        
-        const blueLight = new THREE.DirectionalLight(0x4488ff, 0.8);
-        blueLight.position.set(-5, 5, 5);
-        scene.add(blueLight);
-        
-        // Controles
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        
-        // Carregar modelo
-        const loader = new THREE.GLTFLoader();
-        loader.load('Bobina_Inkcine_optimized.glb', function(gltf) {
-            scene.add(gltf.scene);
+        document.addEventListener('DOMContentLoaded', function() {
+            const modelViewer = document.getElementById('modelViewer');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const hint = document.getElementById('hint');
             
-            // Centralizar modelo
-            const box = new THREE.Box3().setFromObject(gltf.scene);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
+            // Configurações de zoom otimizadas
+            modelViewer.addEventListener('load', () => {
+                // Ajustes manuais para melhor comportamento de zoom
+                setTimeout(() => {
+                    // Esconder loading
+                    loadingOverlay.classList.add('hidden');
+                    
+                    // Mostrar dica inicial por 3 segundos
+                    setTimeout(() => {
+                        hint.classList.add('fade-out');
+                        setTimeout(() => hint.style.display = 'none', 1500);
+                    }, 3000);
+                    
+                    // Ajustar os limites com base no modelo (se necessário)
+                    try {
+                        // Limites mais restritos para melhor controle de zoom
+                        modelViewer.minFieldOfView = '25deg';
+                        modelViewer.maxFieldOfView = '45deg';
+                        modelViewer.minCameraOrbit = 'auto auto 0.8m';
+                        modelViewer.maxCameraOrbit = 'auto auto 15m';
+                    } catch (e) {
+                        console.log('Ajustes de zoom aplicados');
+                    }
+                }, 500);
+            });
             
-            gltf.scene.position.x = -center.x;
-            gltf.scene.position.y = -center.y;
-            gltf.scene.position.z = -center.z;
+            // Esconder a dica quando o usuário interagir
+            let hintHidden = false;
+            const hideHint = () => {
+                if (!hintHidden) {
+                    hintHidden = true;
+                    hint.classList.add('fade-out');
+                    setTimeout(() => hint.style.display = 'none', 1500);
+                }
+            };
             
-            // Ajustar câmera
-            const maxDim = Math.max(size.x, size.y, size.z);
-            camera.position.z = maxDim * 1.5;
-            controls.update();
+            modelViewer.addEventListener('mousedown', hideHint);
+            modelViewer.addEventListener('touchstart', hideHint);
+            modelViewer.addEventListener('wheel', hideHint);
             
-            // Esconder dica
-            document.getElementById('hint').classList.add('fade-out');
-        });
-        
-        // Animação
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-        
-        // Redimensionamento
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // Esconder dica ao interagir
-        renderer.domElement.addEventListener('mousedown', () => {
-            document.getElementById('hint').classList.add('fade-out');
-        });
-        
-        renderer.domElement.addEventListener('touchstart', () => {
-            document.getElementById('hint').classList.add('fade-out');
+            // Em caso de erro
+            modelViewer.addEventListener('error', () => {
+                loadingOverlay.querySelector('p').textContent = 
+                    'Erro ao carregar o modelo. Verifique se o arquivo está correto.';
+            });
+            
+            // Prevenir zoom da página em mobile
+            document.addEventListener('touchmove', function(event) {
+                if (event.touches.length > 1) {
+                    event.preventDefault();
+                }
+            }, { passive: false });
         });
     </script>
 </body>
